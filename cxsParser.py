@@ -24,8 +24,8 @@ class HirshfeldSurface:
         self.unit_cell = []
         self.atoms_inside_surface = []
         self.atoms_outside_surface = []
-        # self.shape_idx = []             # begin shape_index ##
-        # self.curvedness = []            # begin curvedness ##
+        self.shape_idx = []             # begin shape_index ##
+        self.curvedness = []            # begin curvedness ##
         # self.atoms_in = []              # begin atoms_inside_surface ##
         # self.atoms_out = []             # begin atoms_outside_surface ##
 
@@ -75,10 +75,10 @@ class HirshfeldSurface:
                     keys_vals(self.d_i_face_atoms, fi, int(words[-1]))
                 elif key == 'begind_e_face_atoms':
                     keys_vals(self.d_e_face_atoms, fi, int(words[-1]))
-                # elif key == "beginshape_index":
-                #     keys_vals(self.shape_idx, fi, int(words[-1]))
-                # elif key == "begincurvedness":
-                #     keys_vals(self.curvedness, fi, int(words[-1]))
+                elif key == "beginshape_index":
+                    keys_vals(self.shape_idx, fi, int(words[-1]))
+                elif key == "begincurvedness":
+                    keys_vals(self.curvedness, fi, int(words[-1]))
                 # elif key == "beginatoms_inside_surface":
                 #     keys_vals(self.atoms_in, fi, int(words[-1]))
                 # elif key == "beginatoms_outside_surface":
