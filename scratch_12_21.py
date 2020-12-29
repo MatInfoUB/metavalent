@@ -6,8 +6,11 @@ import pandas as pd
 from tqdm import tqdm
 
 cxs_dir = os.path.join('data/SA_cxs_12_21')
+label_file = os.path.join('data', 'metavalent_labels_12_21.csv')
 folderlist = os.listdir(cxs_dir)
 
+labels = pd.read_csv(label_file)
+labels = labels[['Name', 'Category']]
 output_folder = os.path.join('outputs', 'descriptors_12_21')
 # if not os.path.isdir(output_folder):     # If the result folder doesn't exist then create one
 #     os.mkdir(output_folder)
@@ -15,6 +18,9 @@ output_folder = os.path.join('outputs', 'descriptors_12_21')
 descs = ['shape_idx', 'curvedness', 'd_norm']
 stats = ['mean', 'std']
 attr = ['area', 'volume']
+
+si_bins = 4
+curvedness_bins = 5
 
 # cxs_names = []
 # area = []
@@ -61,6 +67,14 @@ for f in tqdm(folderlist):
 
         surf_properties['G_' + str(i + 1)] = 0
 
+        # Ranges
+        for j in range(si_bins):
+            key = 'shape_idx' + '_' + str(i + 1) + '_' + str(j + 1)
+            surf_properties[key] = 0
+        for j in range(curvedness_bins):
+            key = 'curvedness' + '_' + str(i + 1) + '_' + str(j + 1)
+            surf_properties[key] = 0
+
     for cxs in cxs_files:
 
         # cxs_names.append(cxs.split('.')[0])
@@ -84,7 +98,19 @@ for f in tqdm(folderlist):
                 key = desc + '_' + stat + '_' + str(atom_ind + 1)
                 surf_properties[key] = surf_properties[key] + func(getattr(hs, desc)) / atom_count
 
-        surfaces.append(surf_properties)
+        # Ranging values
+        a, _ = np.histogram(hs.shape_idx, range=(-1, 1), bins=si_bins)
+        a = a/sum(a)
+        for j in range(si_bins):
+            key = 'shape_idx' + '_' + str(atom_ind + 1) + '_' + str(j + 1)
+            surf_properties[key] = surf_properties[key] + a[j] / atom_count
+        a, _ = np.histogram(hs.curvedness, range=(-4, 1), bins=curvedness_bins)
+        a = a / sum(a)
+        for j in range(curvedness_bins):
+            key = 'curvedness' + '_' + str(atom_ind + 1) + '_' + str(j + 1)
+            surf_properties[key] = surf_properties[key] + a[j] / atom_count
+
+    surfaces.append(surf_properties)
         # area.append(mesh.area)
         # volume.append(mesh.volume)
         # globularity.append(((36 * np.pi * (mesh.volume ** 2)) ** (1/3)) / (mesh.area))
@@ -97,6 +123,31 @@ for f in tqdm(folderlist):
         # curv_std.append(np.std(hs.curvedness))
 
 df = pd.DataFrame(surfaces)
+df = df.merge(labels, on='Name')
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+i = 0
+
+for desc in descs:
+    for stat in stats:
+        key = desc + '_' + stat + '_' + str(i + 1)
+        sns.displot(data=df, x=key, hue='Category', kind='kde')
+        plt.savefig('figs/figs_12_28/' + key)
+        plt.close()
+for att in attr:
+    key = att + '_' + str(i + 1)
+    sns.displot(data=df, x=key, hue='Category', kind='kde')
+    plt.savefig('figs/figs_12_28/' + key)
+    plt.close()
+
+for j in range(si_bins):
+    key = 'shape_idx' + '_' + str(i + 1) + '_' + str(j + 1)
+    sns.histplot(data=df, x=key, hue='Category')
+    plt.savefig('figs/figs_12_28/' + key)
+    plt.close()
+
 # df = pd.DataFrame({'Area': area, 'Volume': volume,
 #                    'dnorm_mean': dnorm_mean, 'dnorm_std': dnorm_std,
 #                    'si_mean': si_mean, 'si_std': si_std, 'globularity': globularity,
