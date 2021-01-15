@@ -86,7 +86,7 @@ scores = pd.DataFrame({'Names': names, 'Classification Scores': clf_scores,
                        'Time': times, 'Average Score': avg_scores, 'Training Scores': clf_train_scores})
 scores = scores.sort_values(by='Classification Scores', ascending=False)
 sns.barplot(x='Classification Scores', y='Names', data=scores, palette='flare')
-plt.savefig('figs/Comparison_II', bbox_inches='tight', dpi=300)
+plt.savefig('figs/Comparison', bbox_inches='tight', dpi=300)
 
 predict_data = pd.read_csv('data/MVB_data_1500.csv')
 X_pred = predict_data[['Globularity', 'dnorm', 'EN_diff']]
