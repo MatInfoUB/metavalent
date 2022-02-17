@@ -1,22 +1,18 @@
 from os.path import basename, join
 from time import time
-import pickle
-# from math import ceil, floor
+
 import numpy as np
-import scipy as sp
-from sklearn import manifold
 from sklearn.metrics import pairwise
 import matplotlib as mpl
+import colorsys
 
-from vispy import scene, app
-from vispy.scene import visuals
+import trimesh
 
 #mpl.use('agg')
 import matplotlib.pyplot as plt
 from matplotlib import colors, cm
 from matplotlib.colors import LogNorm
-from mpl_toolkits.mplot3d import Axes3D
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection  # Line3DCollection
+
 
 plt.style.use('seaborn-poster')
 
@@ -26,6 +22,22 @@ plt.style.use('seaborn-poster')
 # mpl.rcParams.update({'xtick.labelsize': 22})
 # mpl.rcParams.update({'ytick.labelsize': 22})
 
+
+RWB = np.array([[0.0, 0.0, 1.0], [1.0, 1.0, 1.0], [1.0, 0.0, 0.0]])
+RGB = np.array([[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]])
+
+COLORS = {
+    'd_norm': RWB,
+    'd_i': RGB,
+    'd_e': RGB,
+    'curvedness': RGB,
+    'shape_index': RGB,
+    'deformation_density': RWB,
+    'electron_density': RWB,
+    'promolecule_density': RWB,
+    'electric_potential': RWB,
+    'orbital': RWB,
+}
 
 def find_tag(abs_path):
     return basename(abs_path).strip().split(".")[0]
@@ -121,98 +133,57 @@ def surface_color_scale(surface_property, surfaceIdx, color_scheme):  ## 'bwr_r'
     color_norm = mpl.colors.Normalize(min(color_range), max(color_range))
     color_scale += [color_map(color_norm(value)) for value in color_range]
     return color_scale
+    
 
+def clamp(v, vmin, vmax):
+    return max(min(v, vmax), vmin)
 
-# Function: prepare 3D polygons for plotting Hirshfeld Surface
-def polygons(vtx, idx):
-    tuple_list = np.array(vtx)
-    poly3d = [[tuple_list[idx[ix][iy]] for iy in range(len(idx[0]))] for ix in range(len(idx))]
-    return poly3d
+def hmap(value, vmin, vmax, reverse, hmin, hmax):
+    newval = clamp(value, vmin, vmax)
 
+    range_ratio = 0.0
+    r = vmax - vmin
+    if r > 1e-6:
+        range_ratio = (hmax - hmin) / r
 
-# Function: prepare 3D vectors for plotting Hirshfeld Surface
-def vec3D(vtx):
-    x = np.array(vtx).T[0]
-    y = np.array(vtx).T[1]
-    z = np.array(vtx).T[2]
-    return {'x': x, 'y': y, 'z': z}
+    if reverse:
+        h = 1.0 - range_ratio * (newval - vmin)
+    else:
+        h = range_ratio * (newval - vmin)
 
-
-# plot Hirshfeld surface with specific surface property
-def plot_iso_surf(verts, idx, surface_property, color_scheme, view):
-    fig1 = plt.figure(figsize=(8, 8))
-    ax1 = fig1.add_subplot(111, projection='3d')
-    ax1.scatter(vec3D(verts)['x'], vec3D(verts)['y'], vec3D(verts)['z'], s=1)
-    collection = Poly3DCollection(polygons(verts, idx), linewidths=.0, edgecolor='k', alpha=1)
-    collection.set_facecolors(colors=surface_color_scale(surface_property, idx, color_scheme))
-    ax1.add_collection3d(collection)
-    ax1.view_init(view['x'], view['y'])
-    plt.show()
-
-
-def save_obj(obj, dir_out, fo):
-    with open(join(dir_out, fo + '.pkl'), 'wb') as obj_out:
-        pickle.dump(obj, obj_out, pickle.HIGHEST_PROTOCOL)
-
-
-def map_correlation(x, i, j, step=1, is_save_obj=False, dir_out=None, tag=None):
-    err = np.zeros(j // step, dtype=float)
-    x_iso = manifold.Isomap(n_neighbors=i, n_components=j, neighbors_algorithm='kd_tree')
-    y = x_iso.fit_transform(x)
-    for n_comp in range(1 * step, j + 1, step):
-        err[n_comp // step - 1] = 1 - sp.stats.pearsonr(x_iso.dist_matrix_.flatten(),
-                                                        sp.spatial.distance.cdist(y[:, :n_comp],
-                                                                                  y[:, :n_comp]).flatten())[0] ** 2
-    if is_save_obj:
-        if tag is None:
-            save_obj(y, dir_out, 'mapped_fingerprints_' + str(i))
-        else:
-            save_obj(y, dir_out, 'mapped_fingerprints_' + str(i) + tag)
-    return err
-
+    return colorsys.hsv_to_rgb(clamp(h, hmin, hmax), 1.0, 1.0)
 
 def pairwise_distances_(x):
     return pairwise.pairwise_distances(X=x, Y=None, metric='euclidean')
 
+def colormap(prop, scheme='d_norm', minval=None, maxval=None):
+    vmin = minval if minval else prop.min()
+    vmax = maxval if maxval else prop.max()
 
-def plot_surf_vispy(vertx, idx, surface_property, color_scheme, text=False):
-    canvas = scene.SceneCanvas(keys='interactive', show=True, bgcolor='white')
-    view = canvas.central_widget.add_view()
-    cm = plt.get_cmap('gist_rainbow')
-    p = len(vertx)
-    cmap = np.asarray([cm(1. * i / p) for i in range(p)])
-    # p = scene.visuals.Markers(pos=vertx, size=1, face_color='b')  # Same color for all vertices
-    # p = scene.visuals.Markers(pos=vertx, size=10, face_color=cmap) # Color the vertices according to their numbering
-    # view.add(p)
-    c = surface_color_scale(surface_property, idx, 'bwr_r') # Colormap according to crystalexplorer visualization
-    # c = np.tile([1, 1, 1], (len(idx), 1)) # Colormap for same color applied to all faces
-    mesh = scene.visuals.Mesh(vertices=vertx, faces=idx, face_colors=c)
-    view.add(mesh)
+    colors = np.zeros((prop.shape[0], 3), dtype=np.float32)
 
-    # t1 = scene.visuals.Text(str(1), pos=vertx[0], color='black')
-    # t1.font_size = 12
-    # view.add(t1)
-    #
-    # t1 = scene.visuals.Text(str(10+1), pos=vertx[10], color='black')
-    # t1.font_size = 12
-    # view.add(t1)
-    if text is True:
-        for k, v in enumerate(vertx):
-            t1 = scene.visuals.Text(str(k + 1), pos=v, color='black')
-            t1.font_size = 16
-            view.add(t1)
+    if scheme in {'d_norm', 'electric_potential', 'orbital',
+            'deformation_density', 'electron_density'}:
+        start = COLORS[scheme][0,:]
+        mid = COLORS[scheme][1,:]
+        end = COLORS[scheme][2,:]
+        for i, value in enumerate(prop):
+            colors[i,:] = cmap(value, vmin, vmax, start, mid, end)
+    else:
+        hmax = 240.0/359.0
+        hmin = 0.0
+        for i, value in enumerate(prop):
+            colors[i,:] = hmap(value, vmin, vmax, False, hmin, hmax)
+    return colors
 
-
-    view.camera = 'turntable'
-    axis = visuals.XYZAxis(parent=view.scene)
-
-
-
-    import sys
-    canvas.show()
-    if sys.flags.interactive == 0:
-        app.run()
-
-    return canvas
+def cmap(value, vmin, vmax, start, mid, end):
+    if value < 0:
+        factor = 1.0 - value / vmin
+        color = start
+    else:
+        factor = 1.0 - value / vmax
+        color = end
+    res = color + (mid - color) * factor
+    return res
 
 
