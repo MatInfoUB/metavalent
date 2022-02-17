@@ -1,4 +1,5 @@
-from funcs import *
+from funcs import find_tag, keys_vals, fingerprint, \
+    plot_signature1, plot_signature2
 from os.path import dirname, join
 import pandas as pd
 
@@ -107,8 +108,4 @@ class HirshfeldSurface:
         plot_signature2(self.d_i, self.d_e, self.tag, 101,
                         file_path=join(dirname(self.abs_path), self.tag + "_lo.png"))
 
-    def hirshfeld_surf(self, cmap='bwr_r', prop=None, text=False):
-        #view = {'x': 20, 'y': 60}
-        vertices = np.asarray(self.vtx)
-        faces = np.asarray(self.idx)
-        return plot_surf_vispy(vertices, faces, prop, cmap, text=text)
+
